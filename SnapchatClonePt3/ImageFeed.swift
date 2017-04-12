@@ -61,6 +61,17 @@ func addPost(postImage: UIImage, thread: String, username: String) {
     let path = "\(firStorageImagesPath)/\(UUID().uuidString)"
     
     // YOUR CODE HERE
+    let dateFormatter = DateFormatter()
+    let date = Date()
+    dateFormatter.dateFormat = dateFormat
+   
+    
+    let postDict: [String: String] = [firDateNode: dateFormatter.string(from: date) as String,
+                                      firUsernameNode: username as String,
+                                      firImagePathNode: path as String,
+                                      firThreadNode: thread as String]
+    dbRef.child(firPostsNode).childByAutoId().setValue(postDict)
+    store(data: data, toPath: path)
 }
 
 /*
@@ -75,6 +86,11 @@ func store(data: Data, toPath path: String) {
     let storageRef = FIRStorage.storage().reference()
     
     // YOUR CODE HERE
+    storageRef.child(path).put(data, metadata: nil) { (metadata, error) in
+        if let error = error {
+            print(error)
+        }
+    }
 }
 
 
@@ -100,6 +116,31 @@ func getPosts(user: CurrentUser, completion: @escaping ([Post]?) -> Void) {
     var postArray: [Post] = []
     
     // YOUR CODE HERE
+    dbRef.child(firPostsNode).observeSingleEvent(of: .value, with: { (snapshot) in
+        if (snapshot.exists()) {
+            if let photo = snapshot.value as? [String : AnyObject] {
+                user.getReadPostIDs(completion: { (readPosts: [String]) in
+            
+                    for (key, post) in photo {
+                        if let post = post as? [String : AnyObject] {
+                            let username = post[firUsernameNode] as! String
+                            let postImagePath = post[firImagePathNode] as! String
+                            let thread = post[firThreadNode] as! String
+                            let date = post[firDateNode] as! String
+                            let newPost = Post(id: key, username: username, postImagePath: postImagePath, thread: thread, dateString: date, read: readPosts.contains(key))
+                            
+                            postArray.append(newPost)
+                        }
+                    }
+                    completion(postArray)
+                })
+            } else {
+                completion(nil)
+            }
+        } else {
+            completion(nil)
+        }
+    })
 }
 
 func getDataFromPath(path: String, completion: @escaping (Data?) -> Void) {
